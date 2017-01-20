@@ -1,7 +1,5 @@
-import sun.misc.IOUtils;
-import sun.nio.ch.IOUtil;
 
-import java.io.ByteArrayInputStream;
+import javax.xml.crypto.Data;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.*;
@@ -10,34 +8,12 @@ public class Main {
     public static int packetID = 1;
 
     public static void main(String[] args) {
-        InetAddress addr;
+        //String name = new String(args[0]);
+        String domain = new String("www.google.com");
+
         try {
-            addr = InetAddress.getByName("8.8.8.8");
-            byte[] sendData;
-            byte[] recievedData = new byte[512];
-
-            //String name = new String(args[0]);
-            String name = new String("www.google.com");
-
-            sendData = createQuerry(name);
-
-            DatagramSocket clientSocket;
-            clientSocket = new DatagramSocket();
-            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, addr, 53);
-            clientSocket.send(sendPacket);
-            packetID++;
-
-            DatagramPacket recPacket = new DatagramPacket(recievedData, recievedData.length);
-            clientSocket.receive(recPacket);
-
-            parsePacket(recPacket);
-
-            String answer = new String(recPacket.getData());
-            System.out.println(answer);
-
+            connectViaUDP(InetAddress.getByName("8.8.8.8"), domain);
         } catch (UnknownHostException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
             e.printStackTrace();
         }
     }
@@ -71,6 +47,58 @@ public class Main {
         return query;
     }
 
+    static boolean checkIfTCSet(DatagramPacket packet)
+    {
+        byte[] data = packet.getData();
+        byte flags = data[2];
+        if(((flags >> 1) & 1) == 0)
+            return false;
+        else return true;
+    }
+
+    static void showResult(byte[] resBytes)
+    {
+        System.out.println(new String (resBytes));
+    }
+
+    static void connectViaUDP(InetAddress serverAddr, String domain)
+    {
+        try {
+
+            byte[] sendData;
+            byte[] recievedData = new byte[512];
+
+            sendData = createQuerry(domain);
+
+            DatagramSocket clientSocket;
+            clientSocket = new DatagramSocket();
+            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, serverAddr, 53);
+            clientSocket.send(sendPacket);
+            packetID++;
+
+            DatagramPacket recPacket = new DatagramPacket(recievedData, recievedData.length);
+            clientSocket.receive(recPacket);
+
+            if(!checkIfTCSet(recPacket))
+            {
+                showResult(recPacket.getData());
+            }
+            else
+            {
+                connectViaTCP(serverAddr, domain);
+            }
+        } catch (UnknownHostException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    static void connectViaTCP(InetAddress serverAddr, String domain)
+    {
+
+    }
+
     //changing www.google.com to 3wwww6google3com0
     static byte[] changeToDNSNameFormat(String domain)
     {
@@ -101,7 +129,7 @@ public class Main {
             }
             i++;
         }
-        //dnsFormat += String.valueOf(currentOctets) + temp + "0";
+
         buffer.write(currentOctets);
 
         try {
@@ -114,40 +142,5 @@ public class Main {
 
         return buffer.toByteArray();
     }
-
-    static void parsePacket(DatagramPacket packet)
-    {
-        byte[] data = packet.getData();
-
-        System.out.println(data[3]);
-        System.out.println(data[4]);
-    }
-
-//    //changing 3wwww6google3com0 to www.google.com
-//    byte[] fromDNSFormatToDomain(String dnsFormat)
-//    {
-//        String domain = "";
-//        String temp = "";
-//        int i = 0;
-//        while (i < dnsFormat.length())
-//        {
-//            int octets = Character.getNumericValue(dnsFormat.charAt(i));
-//            int j = 0;
-//            for(j = i+1; j <= octets+i; j++)
-//            {
-//                temp += dnsFormat.charAt(j);
-//            }
-//
-//            domain += temp;
-//
-//            if(j < dnsFormat.length() - 1)
-//                domain += '.';
-//
-//            temp = "";
-//            i = j;
-//        }
-//
-//        return domain;
-//    }
 }
 
