@@ -1,15 +1,17 @@
 
-import javax.xml.crypto.Data;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.*;
+import java.nio.ByteBuffer;
 
 public class Main {
     public static int packetID = 1;
+    public enum TYPE {NONE, A, NS, MD, MF, CNAME, SOA, MB, MG, MR, NULL, WKS, PTR, HINFO, MINFO, MX, TXT, AAAA}
+    public enum CLASS {NONE, IN, CS, CH, HS}
 
     public static void main(String[] args) {
         //String name = new String(args[0]);
-        String domain = new String("www.google.com");
+        String domain = new String("www.vk.com");
 
         try {
             connectViaUDP(InetAddress.getByName("8.8.8.8"), domain);
@@ -56,9 +58,62 @@ public class Main {
         else return true;
     }
 
-    static void showResult(byte[] resBytes)
+    static void showResult(byte[] resBytes, String domain)
     {
-        System.out.println(new String (resBytes));
+
+        int numOfRecords = resBytes[7];
+        int answerBegins = createQuerry(domain).length;
+
+        int i = answerBegins;
+        for(int iterator = 0; iterator < numOfRecords; iterator++)
+        {
+            int type = resBytes[i + 3];
+            TYPE eType;
+            if(type == 28)
+                eType = TYPE.AAAA;
+            else eType = TYPE.values()[type];
+            System.out.print("\nType: " + eType.name());
+
+            int dnsClass = resBytes[i + 5];
+            CLASS eClass = CLASS.values()[dnsClass];
+            System.out.print(" Class: " + eClass.name());
+
+            byte[] ttlBytes = { resBytes[i+6], resBytes[i+7], resBytes[i+8], resBytes[i+9] };
+            int ttl = ByteBuffer.wrap(ttlBytes).getInt();
+            System.out.print(" TTL: " + ttl);
+
+            int iplength = resBytes[i+11];
+            System.out.print(" IP Addres: ");
+
+            if(eType != TYPE.AAAA) {
+                int n;
+                for (n = 0; n < iplength - 1; n++) {
+                    int temp = (resBytes[i + 12 + n] & 0b11111111);
+                    System.out.print(temp + ".");
+                }
+                int temp = (resBytes[i + 12 + n] & 0b11111111);
+                System.out.print(temp);
+            }
+            else
+            {
+                int n;
+                for (n = 0; n < iplength; n+=2) {
+                    for (int j = 0; j < 2; j++)
+                    {
+                        byte[] word = {resBytes[i + 12 + n + j]};
+                        StringBuilder builder = new StringBuilder();
+                        for(byte b : word) {
+                            builder.append(String.format("%02x", b));
+                        }
+                        System.out.print(builder.toString());
+                    }
+                    if(n != iplength - 2)
+                        System.out.print(":");
+                }
+            }
+
+            i += 12 + iplength;
+        }
     }
 
     static void connectViaUDP(InetAddress serverAddr, String domain)
@@ -66,7 +121,7 @@ public class Main {
         try {
 
             byte[] sendData;
-            byte[] recievedData = new byte[512];
+            byte[] receivedData = new byte[512];
 
             sendData = createQuerry(domain);
 
@@ -76,12 +131,12 @@ public class Main {
             clientSocket.send(sendPacket);
             packetID++;
 
-            DatagramPacket recPacket = new DatagramPacket(recievedData, recievedData.length);
+            DatagramPacket recPacket = new DatagramPacket(receivedData, receivedData.length);
             clientSocket.receive(recPacket);
 
             if(!checkIfTCSet(recPacket))
             {
-                showResult(recPacket.getData());
+                showResult(recPacket.getData(), domain);
             }
             else
             {
