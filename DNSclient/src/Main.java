@@ -1,6 +1,4 @@
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.*;
 import java.nio.ByteBuffer;
 
@@ -11,7 +9,7 @@ public class Main {
 
     public static void main(String[] args) {
         //String name = new String(args[0]);
-        String domain = new String("www.vk.com");
+        String domain = new String("www.google.com");
 
         try {
             connectViaUDP(InetAddress.getByName("8.8.8.8"), domain);
@@ -20,7 +18,7 @@ public class Main {
         }
     }
 
-    static byte[] createQuerry(String domain) {
+    static byte[] createQuery(String domain) {
         byte[] dnsFormatDomain = changeToDNSNameFormat(domain);
         byte[] query;
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
@@ -62,7 +60,7 @@ public class Main {
     {
 
         int numOfRecords = resBytes[7];
-        int answerBegins = createQuerry(domain).length;
+        int answerBegins = createQuery(domain).length;
 
         int i = answerBegins;
         for(int iterator = 0; iterator < numOfRecords; iterator++)
@@ -123,7 +121,7 @@ public class Main {
             byte[] sendData;
             byte[] receivedData = new byte[512];
 
-            sendData = createQuerry(domain);
+            sendData = createQuery(domain);
 
             DatagramSocket clientSocket;
             clientSocket = new DatagramSocket();
@@ -151,6 +149,27 @@ public class Main {
 
     static void connectViaTCP(InetAddress serverAddr, String domain)
     {
+        try {
+            byte[] query = createQuery(domain);
+            Socket s = new Socket(serverAddr, 53);
+            short i = (short) query.length;
+
+            DataOutputStream inputBuff = new DataOutputStream(s.getOutputStream());
+            DataInputStream outBuff = new DataInputStream(s.getInputStream());
+
+            inputBuff.writeShort(i);
+            inputBuff.write(query);
+
+            short len;
+            len = outBuff.readShort();
+            byte buf[] = new byte[len];
+            outBuff.read(buf);
+            showResult(buf, domain);
+
+            s.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
     }
 
@@ -170,7 +189,6 @@ public class Main {
             }
             else
             {
-                //dnsFormat += String.valueOf(currentOctets) + temp;
                 buffer.write(currentOctets);
 
                 try {
