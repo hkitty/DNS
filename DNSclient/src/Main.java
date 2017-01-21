@@ -9,10 +9,28 @@ public class Main {
 
     public static void main(String[] args) {
         //String name = new String(args[0]);
-        String domain = new String("www.google.com");
+        String query = new String("www.google.com");
+        String server = new String("www.google.com");
+
+        for(int i = 0; i < args.length; i++)
+        {
+            if(args[i].equals("--server"))
+            {
+                if(i+1 != args.length)
+                    server = args[i+1];
+            }
+
+            if(args[i].equals("--query"))
+            {
+                if(i+1 != args.length)
+                    query = args[i+1];
+            }
+        }
+
+        System.out.println("Searching on " + server + " for " + query);
 
         try {
-            connectViaUDP(InetAddress.getByName("8.8.8.8"), domain);
+            connectViaUDP(InetAddress.getByName(server), query);
         } catch (UnknownHostException e) {
             e.printStackTrace();
         }
@@ -129,8 +147,16 @@ public class Main {
             clientSocket.send(sendPacket);
             packetID++;
 
+            clientSocket.setSoTimeout(2000);
+
             DatagramPacket recPacket = new DatagramPacket(receivedData, receivedData.length);
-            clientSocket.receive(recPacket);
+
+            try {
+                clientSocket.receive(recPacket);
+            }catch (SocketTimeoutException e)
+            {
+                System.out.println("Connection refused, reached timeout.");
+            }
 
             if(!checkIfTCSet(recPacket))
             {
@@ -151,7 +177,9 @@ public class Main {
     {
         try {
             byte[] query = createQuery(domain);
-            Socket s = new Socket(serverAddr, 53);
+            Socket s = new Socket();
+            s.connect(new InetSocketAddress(serverAddr, 53), 2000);
+            s.setSoTimeout(5000);
             short i = (short) query.length;
 
             DataOutputStream inputBuff = new DataOutputStream(s.getOutputStream());
@@ -170,7 +198,6 @@ public class Main {
         } catch (IOException e) {
             e.printStackTrace();
         }
-
     }
 
     //changing www.google.com to 3wwww6google3com0
